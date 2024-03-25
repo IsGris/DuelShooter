@@ -17,6 +17,9 @@ class UShootComponent : public UActorComponent
 	virtual void BeginPlay() override;
 
 public:
+	// Event for shoot
+	UPROPERTY( BlueprintAssignable, Category = "Shoot" )
+	FOnShootSignature OnShoot;
 	UFUNCTION( Exec, BlueprintCallable )
 	void SetGun( const int& NewGunId );
 	UFUNCTION( BlueprintCallable )
@@ -27,15 +30,16 @@ public:
 	// End shooting from gun
 	UFUNCTION( BlueprintCallable )
 	virtual void EndShooting();
+	// Reload gun
+	UFUNCTION(BlueprintCallable)
+	void Reload();
 	// Shoot 1 ammo
 	UFUNCTION( BlueprintCallable )
 	virtual void Shoot();
-	// Makes shot without checking for ammo and other things
-	virtual void MakeShot();
 	// Reset spread of gun
 	virtual void ResetSpread();
 	// Adds spread to the sight
-	virtual void AppendSpread();
+	virtual void AppendSpreadToScreen();
 	// Checks does gun now shooting
 	UFUNCTION( BlueprintCallable )
 	bool IsShooting() const;
@@ -49,8 +53,7 @@ protected:
 	const FGunInfo* Gun;
 	UPROPERTY( BlueprintReadWrite, Category = "Gun" )
 	FGunConsumables GunConsumables;
-	UPROPERTY( BlueprintReadWrite, Category = "Gun" )
-	FDateTime LastShootTime;
+
 	UPROPERTY()
 	FTimerHandle ShootingTimer;
 };
