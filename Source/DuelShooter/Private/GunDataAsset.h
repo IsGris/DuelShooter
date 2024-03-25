@@ -6,8 +6,11 @@
 #include "Engine/DataAsset.h"
 #include "GunDataAsset.generated.h"
 
+DECLARE_DYNAMIC_MULTICAST_DELEGATE( FReloadSignature );
+DECLARE_LOG_CATEGORY_EXTERN(GunDatasLog, Log, All);
+
 // Time between shots in seconds to reset spread to default value 
-#define TIME_BETWEENSHOTS_TO_RESET_SPREAD 1
+#define TIME_BETWEEN_SHOTS_TO_RESET_SPREAD 2
 // How far forward can a bullet travel
 #define BULLET_DISTANCE 10000
 
@@ -19,12 +22,30 @@ struct FGunConsumables
 {
 	GENERATED_BODY()
 
-	void InitGun( const FGunInfo& GunInfo );
+	void InitGun( const FGunInfo& GunInfo, const AActor& OwnerActor );
 
 protected:
 	const FGunInfo* Gun;
+	const AActor* Owner;
+	// Does gun reloading
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Gun")
+	bool bIsReloading = false;
+	bool CanReload() const;
+	void EndReload();
+	UPROPERTY(BlueprintReadWrite, Category = "Gun")
+	FDateTime LastShootTime;
 
 public:
+	UPROPERTY(BlueprintAssignable)
+	FReloadSignature OnReloadStart;
+	UPROPERTY( BlueprintAssignable )
+	FReloadSignature OnReloadEnd;
+	void StartReload();
+	bool IsReloading() const;
+	void ResetSpread();
+	void AppendSpread();
+	bool CanShoot() const;
+	void MakeShot();
 	// How many bullets remaining in magazine of weapon
 	UPROPERTY( EditDefaultsOnly, BlueprintReadWrite, Category = "Gun" )
 	int BulletsInMagazineRemains = 0;
@@ -51,6 +72,10 @@ struct FGunInfo
 public:
 	UPROPERTY( EditDefaultsOnly, BlueprintReadWrite, Category = "Cosmetic" )
 	FString GunName;
+	// If true, then the person will fire all the cartridges from the magazine while holding down the fire button, 
+	// Otherwise he will have to press the fire button again each time to shoot
+	UPROPERTY( EditDefaultsOnly, BlueprintReadWrite, Category = "Cosmetic" )
+	bool bCanShootByHoldDownButton = true;
 	// Time between shots in seconds
 	UPROPERTY( EditDefaultsOnly, BlueprintReadWrite, Category = "Gun" )
 	float ShotsDelay = 1;

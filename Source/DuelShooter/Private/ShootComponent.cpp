@@ -13,6 +13,8 @@ void UShootComponent::BeginPlay()
 	Super::BeginPlay();
 	
 	PrimaryComponentTick.bCanEverTick = false;
+	
+	Owner = GetOwner();
 
 	// Init gun
 	if ( GunId > -1 )
@@ -20,10 +22,8 @@ void UShootComponent::BeginPlay()
 			if ( auto GunData = GameMode->GetGunData( GunId ) )
 			{
 				Gun = GunData;
-				GunConsumables.InitGun( *GunData );
+				GunConsumables.InitGun( *GunData, *Owner );
 			}
-
-	Owner = GetOwner();
 }
 
 
@@ -38,7 +38,7 @@ void UShootComponent::SetGun( const int& NewGunId )
 			if ( auto GunData = GameMode->GetGunData( GunId ) )
 			{
 				Gun = GunData;
-				GunConsumables.InitGun( *GunData );
+				GunConsumables.InitGun( *GunData, *Owner );
 			}
 }
 
@@ -46,14 +46,19 @@ void UShootComponent::SetGunByInfo( const FGunInfo& NewGunInfo )
 {
 	GunId = -1;
 	Gun = &NewGunInfo;
-	GunConsumables.InitGun( NewGunInfo );
+	GunConsumables.InitGun( NewGunInfo, *Owner );
 }
 
 void UShootComponent::StartShooting()
 {
-	if ( auto World = GetWorld() )
-		if ( auto* TimerManager = &World->GetTimerManager() )
-			( *TimerManager ).SetTimer( ShootingTimer, this, &UShootComponent::Shoot, Gun->ShotsDelay, true );
+	if (!Gun->bCanShootByHoldDownButton)
+		Shoot();
+	else
+	{
+		if (auto World = GetWorld())
+			if (auto* TimerManager = &World->GetTimerManager())
+				(*TimerManager).SetTimer(ShootingTimer, this, &UShootComponent::Shoot, Gun->ShotsDelay, true, 0);
+	}
 }
 
 void UShootComponent::EndShooting()
@@ -63,48 +68,37 @@ void UShootComponent::EndShooting()
 			(*TimerManager).ClearTimer(ShootingTimer);
 }
 
-void UShootComponent::Shoot()
+void UShootComponent::Reload()
 {
-	// Check for ammo
-	if ( !( GunConsumables.BulletsInMagazineRemains > 0 ) )
-		return;
-
-	if ( LastShootTime + FTimespan::FromSeconds( TIME_BETWEENSHOTS_TO_RESET_SPREAD ) < FDateTime::Now() ) // Does we need to reset spread of gun before shooting
-	{
-		ResetSpread();
-		MakeShot();
-		AppendSpread();
-	}
-	else
-	{
-		MakeShot();
-		AppendSpread();
-	}
+	GunConsumables.StartReload();
 }
 
-void UShootComponent::MakeShot()
+void UShootComponent::Shoot()
 {
-	GunConsumables.BulletsInMagazineRemains -= 1;
-	GunConsumables.CurrentBulletShotedContinouslyCount += 1;
+	if ( !GunConsumables.CanShoot() )
+		return;
+	
+	GunConsumables.MakeShot();
 
 	FHitResult BulletHitResult;
-	if ( auto World = GetWorld() )
-		if ( World->LineTraceSingleByChannel( BulletHitResult, Owner->GetActorLocation(), Owner->GetActorForwardVector() * BULLET_DISTANCE, ECollisionChannel::ECC_Visibility ) )
-			UGameplayStatics::ApplyPointDamage( BulletHitResult.GetActor(), Gun->Damage, BulletHitResult.TraceStart, BulletHitResult, Owner->GetInstigatorController(), Owner, UBulletDamage::StaticClass() );
-	DrawDebugLine( GetWorld(), Owner->GetActorLocation(), Owner->GetActorForwardVector() * BULLET_DISTANCE, FColor::Red, false, 2, 0, 2 );
+	if (auto World = GetWorld())
+		if (World->LineTraceSingleByChannel(BulletHitResult, Owner->GetActorLocation(), Owner->GetActorForwardVector() * BULLET_DISTANCE, ECollisionChannel::ECC_Visibility))
+			UGameplayStatics::ApplyPointDamage(BulletHitResult.GetActor(), Gun->Damage, BulletHitResult.TraceStart, BulletHitResult, Owner->GetInstigatorController(), Owner, UBulletDamage::StaticClass());
+	DrawDebugLine(GetWorld(), Owner->GetActorLocation(), Owner->GetActorForwardVector() * BULLET_DISTANCE, FColor::Red, false, 2, 0, 2);
 
-	LastShootTime = FDateTime::Now();
+	AppendSpreadToScreen();
+
+	OnShoot.Broadcast();
 }
 
 void UShootComponent::ResetSpread()
 {
-	GunConsumables.CurrentBulletShotedContinouslyCount = 0;
+	GunConsumables.ResetSpread();
 }
 
-void UShootComponent::AppendSpread()
+void UShootComponent::AppendSpreadToScreen()
 {
 	Owner->SetActorRotation( Owner->GetActorRotation() + GunConsumables.GetRotationToAppendForSpread() );
-	GunConsumables.CurrentBulletShotedContinouslyCount += 1;
 }
 
 bool UShootComponent::IsShooting() const

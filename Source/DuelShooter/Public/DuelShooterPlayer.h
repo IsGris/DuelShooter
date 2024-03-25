@@ -57,6 +57,8 @@ protected:
 	UPROPERTY( EditDefaultsOnly, Category = "Input" )
 	UInputAction* ShootSwapAction;
 	UPROPERTY(EditDefaultsOnly, Category = "Input")
+	UInputAction* ReloadAction;
+	UPROPERTY(EditDefaultsOnly, Category = "Input")
 	UInputAction* MoveAction;
 	UPROPERTY(EditDefaultsOnly, Category = "Input")
 	UInputAction* LookAction;

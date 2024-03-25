@@ -64,6 +64,13 @@ void ADuelShooterPlayer::SetupPlayerInputComponent(UInputComponent* PlayerInputC
         } else
             UE_LOG( DuelShooterPlayerLog, Warning, TEXT( "ShootSwap input action is not defined" ) );
 
+        if (ReloadAction)
+        {
+            PlayerEnhancedInputComponent->BindAction(ReloadAction, ETriggerEvent::Triggered, ShootComponent, &UShootComponent::Reload);
+        }
+        else
+            UE_LOG(DuelShooterPlayerLog, Warning, TEXT("ReloadAction input action is not defined"));
+
         if (MoveAction)
         {
             PlayerEnhancedInputComponent->BindAction(MoveAction, ETriggerEvent::Triggered, this, &ADuelShooterPlayer::MakeMove);
@@ -77,13 +84,6 @@ void ADuelShooterPlayer::SetupPlayerInputComponent(UInputComponent* PlayerInputC
         }
         else
             UE_LOG(DuelShooterPlayerLog, Warning, TEXT("LookAction input action is not defined"));
-
-        if (GoBackAction)
-        {
-            PlayerEnhancedInputComponent->BindAction(GoBackAction, ETriggerEvent::Triggered, this, &ADuelShooterPlayer::GoBack);
-        }
-        else
-            UE_LOG(DuelShooterPlayerLog, Warning, TEXT("GoBackAction input action is not defined"));
 
         if (CrouchAction)
         {
@@ -106,6 +106,13 @@ void ADuelShooterPlayer::SetupPlayerInputComponent(UInputComponent* PlayerInputC
         else
             UE_LOG(DuelShooterPlayerLog, Warning, TEXT("JumpAction input action is not defined"));
 
+        if (GoBackAction)
+        {
+            PlayerEnhancedInputComponent->BindAction(GoBackAction, ETriggerEvent::Triggered, this, &ADuelShooterPlayer::GoBack);
+        }
+        else
+            UE_LOG(DuelShooterPlayerLog, Warning, TEXT("GoBackAction input action is not defined"));
+
         UE_LOG( DuelShooterPlayerLog, Log, TEXT( "Input actions successfully binded" ) );
     } else
         UE_LOG( DuelShooterPlayerLog, Error, TEXT( "Cannot bind input actions: Failed to get UEnhancedInputComponent" ) );
@@ -113,7 +120,6 @@ void ADuelShooterPlayer::SetupPlayerInputComponent(UInputComponent* PlayerInputC
 
 void ADuelShooterPlayer::SwapShootingState()
 {
-    UE_LOG( DuelShooterPlayerLog, Log, TEXT( "Swap shooting state" ) );
     if ( ShootComponent->IsShooting() )
 		ShootComponent->EndShooting();
 	else
