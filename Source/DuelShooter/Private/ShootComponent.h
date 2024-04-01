@@ -53,7 +53,6 @@ protected:
 	const FGunInfo* Gun;
 	UPROPERTY( BlueprintReadWrite, Category = "Gun" )
 	FGunConsumables GunConsumables;
-
 	UPROPERTY()
 	FTimerHandle ShootingTimer;
 };

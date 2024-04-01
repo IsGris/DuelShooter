@@ -88,32 +88,38 @@ void FGunConsumables::MakeShot()
 	LastShootTime = FDateTime::Now();
 }
 
-FRotator FGunConsumables::GetRotationToAppendForSpread()
+FRotator FGunConsumables::GetGunRotationToAppendForSpread() 
+{
+	if (!Gun->Spread.IsEmpty())
+		return FRotator(
+			-Gun->Spread[FGenericPlatformMath::Min(CurrentBulletShotedContinouslyCount - 1, Gun->Spread.Num() - 1)].Value,
+			-Gun->Spread[FGenericPlatformMath::Min(CurrentBulletShotedContinouslyCount - 1, Gun->Spread.Num() - 1)].Key,
+			0);
+	else
+		return FRotator();
+}
+
+FRotator FGunConsumables::GetCharacterRotationToAppendForSpread()
 {
 	if ( !Gun->Spread.IsEmpty() )
-		return FRotator( 0, 
-			Gun->Spread[FGenericPlatformMath::Min(CurrentBulletShotedContinouslyCount - 1, Gun->Spread.Num() - 1)].Key, 
-			Gun->Spread[FGenericPlatformMath::Min(CurrentBulletShotedContinouslyCount - 1, Gun->Spread.Num() - 1)].Value );
+		return FRotator(
+			-Gun->Spread[FGenericPlatformMath::Min(CurrentBulletShotedContinouslyCount - 1, Gun->Spread.Num() - 1)].Value * CHARACTER_ROTATION_SPREAD_MULTIPLIER,
+			-Gun->Spread[FGenericPlatformMath::Min(CurrentBulletShotedContinouslyCount - 1, Gun->Spread.Num() - 1)].Key * CHARACTER_ROTATION_SPREAD_MULTIPLIER,
+			0 );
 	else
 		return FRotator();
 }
 
 void FGunInfo::Init()
 {
-	if ( MagazineAmmoCount > 0 && SpreadX.GetRichCurveConst()->GetNumKeys() > 0 && SpreadY.GetRichCurveConst()->GetNumKeys() > 0 )
+	if ( MagazineAmmoCount > 0 )
 	{
 		Spread.Empty();
 		Spread.Reserve( MagazineAmmoCount );
-		IntervalsBetweenShotsInCurveX = ( SpreadX.GetRichCurveConst()->GetLastKey().Time - SpreadX.GetRichCurveConst()->GetFirstKey().Time ) / MagazineAmmoCount;
-		IntervalsBetweenShotsInCurveY = ( SpreadY.GetRichCurveConst()->GetLastKey().Time - SpreadY.GetRichCurveConst()->GetFirstKey().Time ) / MagazineAmmoCount;
-		for ( int i{}; i < MagazineAmmoCount; i++ )
+		for ( int i{1}; i <= MagazineAmmoCount; i++ )
 		{
-			Spread.Add( { SpreadX.GetRichCurveConst()->Eval( i * IntervalsBetweenShotsInCurveX ), SpreadY.GetRichCurveConst()->Eval( i * IntervalsBetweenShotsInCurveY ) } );
+			Spread.Add( { SpreadX.GetRichCurveConst()->Eval( i ), SpreadY.GetRichCurveConst()->Eval( i ) } );
 		}
-	#if !UE_BUILD_SHIPPING
-		if ( Spread.Num() < MagazineAmmoCount )
-			UE_LOG(GunDatasLog, Warning, TEXT( "Spread size is smaller than MagazineAmmoCount" ) );
-	#endif
 	}
 }
 

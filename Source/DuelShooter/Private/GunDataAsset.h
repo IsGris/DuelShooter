@@ -13,6 +13,11 @@ DECLARE_LOG_CATEGORY_EXTERN(GunDatasLog, Log, All);
 #define TIME_BETWEEN_SHOTS_TO_RESET_SPREAD 2
 // How far forward can a bullet travel
 #define BULLET_DISTANCE 10000
+#define CHARACTER_ROTATION_SPREAD_MULTIPLIER 0.3f
+#define DAMAGE_MULTIPLIER_IN_HEAD 1.0f
+#define DAMAGE_MULTIPLIER_IN_BODY 0.3f
+#define DAMAGE_MULTIPLIER_IN_HAND 0.25f
+#define DAMAGE_MULTIPLIER_IN_LEG 0.18f
 
 /**
  * Stores weapon data that can change
@@ -55,8 +60,10 @@ public:
 	// How many bullets gun fired continuously
 	UPROPERTY( BlueprintReadWrite, Category = "Spread" )
 	int CurrentBulletShotedContinouslyCount = 0;
+	// Gets rotation that needs to be added to the gun sight to apply spread
+	FRotator GetGunRotationToAppendForSpread();
 	// Gets rotation that needs to be added to the player to apply spread
-	FRotator GetRotationToAppendForSpread();
+	FRotator GetCharacterRotationToAppendForSpread();
 };
 
 /**
@@ -94,24 +101,18 @@ public:
 	// Number of elements = number of bullets in the magazine
 	// The index indicates which cartridge we fired from the magazine
 	// TPair in every element indicates the deviation along the X axis and Y axis
-	TArray<TPair<int, int>> Spread;
+	TArray<TPair<float, float>> Spread;
 private:
 	// A curve that displays Spread in camera when shooting
-	// X-axis means how many bullets gun shooted starting from the beginning to the end of the curve
+	// X-axis means how many bullets gun shooted starting from 1 and ending to MagazineAmmoCount
 	// Y-axis means the deflection of the sight to the right or left
 	UPROPERTY( EditDefaultsOnly, Category = "Gun" )
 	FRuntimeFloatCurve SpreadX;
 	// A curve that displays Spread in camera when shooting
-	// X-axis means how many bullets gun shooted starting from the beginning to the end of the curve
+	// X-axis means how many bullets gun shooted starting from 1 and ending to MagazineAmmoCount
 	// Y-axis means the deflection of the sight to the up or down
 	UPROPERTY( EditDefaultsOnly, Category = "Gun" )
 	FRuntimeFloatCurve SpreadY;
-	// How big is the step between shots in the X axis to take into account all the spread available in the curve
-	UPROPERTY()
-	int IntervalsBetweenShotsInCurveX;
-	// How big is the step between shots in the Y axis to take into account all the spread available in the curve
-	UPROPERTY()
-	int IntervalsBetweenShotsInCurveY;
 };
 
 /**
