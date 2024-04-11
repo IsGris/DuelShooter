@@ -7,6 +7,7 @@
 #include "GunDataAsset.h"
 #include "Misc/Timespan.h"
 #include "BulletDamage.h"
+#include "Kismet/KismetMathLibrary.h"
 
 void UShootComponent::BeginPlay()
 {
@@ -15,6 +16,7 @@ void UShootComponent::BeginPlay()
 	PrimaryComponentTick.bCanEverTick = false;
 	
 	Owner = GetOwner();
+	GunConsumables = NewObject<UGunConsumables>();
 
 	// Init gun
 	if ( GunId > -1 )
@@ -22,7 +24,7 @@ void UShootComponent::BeginPlay()
 			if ( auto GunData = GameMode->GetGunData( GunId ) )
 			{
 				Gun = GunData;
-				GunConsumables.InitGun( *GunData, *Owner );
+				GunConsumables->InitGun( *GunData, Owner, this );
 			}
 }
 
@@ -38,7 +40,7 @@ void UShootComponent::SetGun( const int& NewGunId )
 			if ( auto GunData = GameMode->GetGunData( GunId ) )
 			{
 				Gun = GunData;
-				GunConsumables.InitGun( *GunData, *Owner );
+				GunConsumables->InitGun(*GunData, Owner, this );
 			}
 }
 
@@ -46,7 +48,7 @@ void UShootComponent::SetGunByInfo( const FGunInfo& NewGunInfo )
 {
 	GunId = -1;
 	Gun = &NewGunInfo;
-	GunConsumables.InitGun( NewGunInfo, *Owner );
+	GunConsumables->InitGun( NewGunInfo, Owner, this );
 }
 
 void UShootComponent::StartShooting()
@@ -70,19 +72,19 @@ void UShootComponent::EndShooting()
 
 void UShootComponent::Reload()
 {
-	GunConsumables.StartReload();
+	GunConsumables->StartReload();
 }
 
 void UShootComponent::Shoot()
 {
-	if ( !GunConsumables.CanShoot() )
+	if ( !GunConsumables->CanShoot() )
 		return;
 	
-	GunConsumables.MakeShot();
+	UE_LOG(LogTemp, Warning, TEXT("%s"), *(UKismetMathLibrary::GetForwardVector(Owner->GetActorRotation() + GunConsumables->SpreadRotator).ToString()));
 
 	FHitResult BulletHitResult;
 	if (auto World = GetWorld())
-		if (World->LineTraceSingleByChannel(BulletHitResult, Owner->GetActorLocation(), Owner->GetActorForwardVector() * BULLET_DISTANCE, ECollisionChannel::ECC_Visibility))
+		if (World->LineTraceSingleByChannel(BulletHitResult, Owner->GetActorLocation(), UKismetMathLibrary::GetForwardVector(Owner->GetActorRotation() + GunConsumables->SpreadRotator) * BULLET_DISTANCE, ECollisionChannel::ECC_Visibility))
 		{
 			if (BulletHitResult.BoneName.ToString().Contains("head"))
 				UGameplayStatics::ApplyPointDamage(BulletHitResult.GetActor(), Gun->Damage * DAMAGE_MULTIPLIER_IN_HEAD, BulletHitResult.TraceStart, BulletHitResult, Owner->GetInstigatorController(), Owner, UBulletDamage::StaticClass());
@@ -95,36 +97,9 @@ void UShootComponent::Shoot()
 			else 
 				UGameplayStatics::ApplyPointDamage(BulletHitResult.GetActor(), Gun->Damage, BulletHitResult.TraceStart, BulletHitResult, Owner->GetInstigatorController(), Owner, UBulletDamage::StaticClass());
 		}
-	DrawDebugLine(GetWorld(), Owner->GetActorLocation(), Owner->GetActorForwardVector() * BULLET_DISTANCE, FColor::Red, false, 2, 0, 2);
-
-	AppendSpreadToScreen();
+	DrawDebugLine(GetWorld(), Owner->GetActorLocation(), UKismetMathLibrary::GetForwardVector(Owner->GetActorRotation() + GunConsumables->SpreadRotator) * BULLET_DISTANCE, FColor::Red, false, 2, 0, 2);
 
 	OnShoot.Broadcast();
-}
-
-void UShootComponent::ResetSpread()
-{
-	GunConsumables.ResetSpread();
-}
-
-void UShootComponent::AppendSpreadToScreen()
-{
-	auto RotationToAppend = GunConsumables.GetRotationToAppendForSpread();
-	if (auto OwnerAsPawn = Cast<APawn>(Owner)) {
-
-		if ( OwnerAsPawn->bUseControllerRotationYaw )
-			OwnerAsPawn->AddControllerYawInput(RotationToAppend.Yaw);
-		else
-			Owner->AddActorLocalRotation( FRotator(0, RotationToAppend.Yaw, 0) );
-
-		if (OwnerAsPawn->bUseControllerRotationPitch)
-			OwnerAsPawn->AddControllerPitchInput(RotationToAppend.Pitch);
-		else
-			Owner->AddActorLocalRotation( FRotator(RotationToAppend.Pitch, 0, 0) );
-
-	}
-	else
-		Owner->AddActorLocalRotation( RotationToAppend );
 }
 
 bool UShootComponent::IsShooting() const

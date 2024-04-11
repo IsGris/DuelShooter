@@ -4,67 +4,24 @@
 
 #include "CoreMinimal.h"
 #include "Engine/DataAsset.h"
+#include "Containers/Ticker.h"
+
 #include "GunDataAsset.generated.h"
 
-DECLARE_DYNAMIC_MULTICAST_DELEGATE( FReloadSignature );
+DECLARE_DYNAMIC_MULTICAST_DELEGATE(FReloadSignature);
+DECLARE_MULTICAST_DELEGATE_FourParams( FOnSpreadAddedSignature, FRotator/*SpreadAddedToSight*/, FRotator/*SpreadAddedToCharacter*/, FRotator/*SightSpreadFromCharacter*/, FRotator/*CharacterRotation*/);
 DECLARE_LOG_CATEGORY_EXTERN(GunDatasLog, Log, All);
 
 // Time between shots in seconds to reset spread to default value 
-#define TIME_BETWEEN_SHOTS_TO_RESET_SPREAD 2
+#define TIME_BETWEEN_SHOTS_TO_RESET_SPREAD 2.0f
 // How far forward can a bullet travel
 #define BULLET_DISTANCE 10000
+#define SIGHT_SPREAD_RESET_SPEED 0.5f
 #define CHARACTER_ROTATION_SPREAD_MULTIPLIER 0.3f
 #define DAMAGE_MULTIPLIER_IN_HEAD 1.0f
 #define DAMAGE_MULTIPLIER_IN_BODY 0.3f
 #define DAMAGE_MULTIPLIER_IN_HAND 0.25f
 #define DAMAGE_MULTIPLIER_IN_LEG 0.18f
-
-/**
- * Stores weapon data that can change
- */
-USTRUCT( BlueprintType )
-struct FGunConsumables
-{
-	GENERATED_BODY()
-
-	void InitGun( const FGunInfo& GunInfo, const AActor& OwnerActor );
-
-protected:
-	const FGunInfo* Gun;
-	const AActor* Owner;
-	// Does gun reloading
-	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Gun")
-	bool bIsReloading = false;
-	bool CanReload() const;
-	void EndReload();
-	UPROPERTY(BlueprintReadWrite, Category = "Gun")
-	FDateTime LastShootTime;
-
-public:
-	UPROPERTY(BlueprintAssignable)
-	FReloadSignature OnReloadStart;
-	UPROPERTY( BlueprintAssignable )
-	FReloadSignature OnReloadEnd;
-	void StartReload();
-	bool IsReloading() const;
-	void ResetSpread();
-	void AppendSpread();
-	bool CanShoot() const;
-	void MakeShot();
-	// How many bullets remaining in magazine of weapon
-	UPROPERTY( EditDefaultsOnly, BlueprintReadWrite, Category = "Gun" )
-	int BulletsInMagazineRemains = 0;
-	// How many bullets remaining in weapon not including magazine
-	UPROPERTY( EditDefaultsOnly, BlueprintReadWrite, Category = "Gun" )
-	int BulletsNotInMagazineRemains = 0;
-	// How many bullets gun fired continuously
-	UPROPERTY( BlueprintReadWrite, Category = "Spread" )
-	int CurrentBulletShotedContinouslyCount = 0;
-	// Gets rotation that needs to be added to the gun sight to apply spread
-	FRotator GetGunRotationToAppendForSpread();
-	// Gets rotation that needs to be added to the player to apply spread
-	FRotator GetCharacterRotationToAppendForSpread();
-};
 
 /**
  * Stores one weapon data
@@ -113,6 +70,94 @@ private:
 	// Y-axis means the deflection of the sight to the up or down
 	UPROPERTY( EditDefaultsOnly, Category = "Gun" )
 	FRuntimeFloatCurve SpreadY;
+};
+
+/**
+ * Stores weapon data that can change
+ */
+UCLASS(BlueprintType)
+class UGunConsumables : public UObject
+{
+	GENERATED_BODY()
+
+public:
+	UFUNCTION(BlueprintCallable)
+	void InitGun(const FGunInfo& GunInfo, AActor* OwnerActor, UShootComponent* OwnerShootComponent);
+
+protected:
+	const FGunInfo* Gun;
+	UPROPERTY(BlueprintReadOnly)
+	TObjectPtr<UShootComponent> ShootComponent;
+	UPROPERTY(BlueprintReadOnly)
+	TObjectPtr<AActor> Owner;
+	// Does gun reloading
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Gun")
+	bool bIsReloading = false;
+	UFUNCTION(BlueprintCallable)
+	bool CanReload() const;
+	UFUNCTION()
+	void EndReload();
+	UPROPERTY(BlueprintReadWrite, Category = "Gun")
+	FDateTime LastShootTime;
+	UFUNCTION()
+	void AppendSpread();
+	UFUNCTION()
+	void StartResetSpread();
+	UFUNCTION()
+	bool ResetSpreadTick(float DeltaTime);
+	UFUNCTION()
+	void EndResetSpread();
+	FTickerDelegate ResetSpreadTickerDelegate;
+	FTSTicker::FDelegateHandle ResetSpreadTickerDelegateHandle;
+	UPROPERTY()
+	FDateTime StartResetSpreadTime;
+	UPROPERTY()
+	FRotator RotationBeforeResetSpread = FRotator::ZeroRotator;
+	UPROPERTY()
+	FTimerHandle ResetSpreadAfterShootTimerHandle;
+
+public:
+	UPROPERTY(BlueprintAssignable)
+	FReloadSignature OnReloadStart;
+	UPROPERTY( BlueprintAssignable )
+	FReloadSignature OnReloadEnd;
+	// Event for spread added
+	// * SpreadAddedToSight - added to sight rotation
+	// * SpreadAddedToCharacter - added to player rotation
+	// * SightSpreadFromCharacter - rotator that will be added to the player's rotator to get the crosshair location
+	// * CharacterRotation - current player rotator
+	FOnSpreadAddedSignature OnSpreadAdded;
+	void StartReload();
+	UFUNCTION(BlueprintCallable)
+	bool IsReloading() const;
+	UFUNCTION(BlueprintCallable)
+	bool CanShoot() const;
+	UFUNCTION()
+	void MakeShot();
+	// How many bullets remaining in magazine of weapon
+	UPROPERTY( EditDefaultsOnly, BlueprintReadWrite, Category = "Gun" )
+	int BulletsInMagazineRemains = 0;
+	// How many bullets remaining in weapon not including magazine
+	UPROPERTY( EditDefaultsOnly, BlueprintReadWrite, Category = "Gun" )
+	int BulletsNotInMagazineRemains = 0;
+	// How many bullets gun fired continuously
+	UPROPERTY( BlueprintReadWrite, Category = "Spread" )
+	int CurrentBulletShotedContinouslyCount = 0;
+	/**
+	* Кotation that needs to be added to the gun sight to apply spread
+	* @param SpreadIndex what cartridge do we need the spread from
+	*/
+	UFUNCTION()
+	FRotator GetGunRotationToAppendForSpread( const int& SpreadIndex = -1 );
+	/**
+	* Rotation that will be added to the view angle for player to apply spread
+	* @param SpreadIndex what cartridge do we need the spread from
+	*/
+	UFUNCTION()
+	FRotator GetCharacterRotationToAppendForSpread( const int& SpreadIndex = -1 );
+	// Rotator that will be added to initial player rotation to add spread
+	UPROPERTY( BlueprintReadWrite, Category = "Spread" )
+	FRotator SpreadRotator = FRotator::ZeroRotator;
 };
 
 /**

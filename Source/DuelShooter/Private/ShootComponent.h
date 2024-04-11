@@ -36,10 +36,6 @@ public:
 	// Shoot 1 ammo
 	UFUNCTION( BlueprintCallable )
 	virtual void Shoot();
-	// Reset spread of gun
-	virtual void ResetSpread();
-	// Adds spread to the sight
-	virtual void AppendSpreadToScreen();
 	// Checks does gun now shooting
 	UFUNCTION( BlueprintCallable )
 	bool IsShooting() const;
@@ -52,7 +48,7 @@ protected:
 	// Current gun
 	const FGunInfo* Gun;
 	UPROPERTY( BlueprintReadWrite, Category = "Gun" )
-	FGunConsumables GunConsumables;
+	UGunConsumables* GunConsumables;
 	UPROPERTY()
 	FTimerHandle ShootingTimer;
 };
