@@ -8,6 +8,9 @@
 #include "ShootComponent.h"
 #include "Camera/CameraComponent.h"
 #include "DuelShooterPlayerController.h"
+#include "Blueprint/UserWidget.h"
+#include "Blueprint/WidgetTree.h"
+#include "WidgetDuelShooterFunctionLibrary.h"
 
 DEFINE_LOG_CATEGORY( DuelShooterPlayerLog );
 
@@ -25,6 +28,32 @@ void ADuelShooterPlayer::BeginPlay()
     PrimaryActorTick.bCanEverTick = false;
 
     PlayerController = Cast<ADuelShooterPlayerController>(GetController());
+
+    InitWidgets();
+}
+
+void ADuelShooterPlayer::InitWidgets()
+{
+    PlayerHUD = UWidgetDuelShooterFunctionLibrary::InitWidgetInstance(Cast<APlayerController>(GetController()), PlayerInGameHUD, FName("PlayerHUD"));
+
+    if (PlayerHUD) 
+    {
+        TArray<UWidget*> AllPlayerHUDWidgets;
+        PlayerHUD->WidgetTree->GetAllWidgets(AllPlayerHUDWidgets);
+        bool IsCrosshairFinded = false;
+        for (auto& HUDWidget : AllPlayerHUDWidgets)
+            if (HUDWidget->GetName().Contains("Crosshair")) {
+                ShootComponent->InitCrosshair(HUDWidget);
+                IsCrosshairFinded = true;
+                break;
+            }
+
+        if (!IsCrosshairFinded)
+            UE_LOG(DuelShooterPlayerLog, Warning, TEXT("In PlayerInGameHUD widget with name Crosshair not finded"));
+    } else 
+        UE_LOG(DuelShooterPlayerLog, Warning, TEXT("PlayerInGameHUD not defined"));
+
+    UE_LOG(DuelShooterPlayerLog, Log, TEXT("Widgets inited"));
 }
 
 void ADuelShooterPlayer::PawnClientRestart()
@@ -113,6 +142,15 @@ void ADuelShooterPlayer::SetupPlayerInputComponent(UInputComponent* PlayerInputC
         else
             UE_LOG(DuelShooterPlayerLog, Warning, TEXT("GoBackAction input action is not defined"));
 
+#if WITH_EDITORONLY_DATA
+        if (DebugAction)
+        {
+            PlayerEnhancedInputComponent->BindAction(DebugAction, ETriggerEvent::Triggered, this, &ADuelShooterPlayer::DoDebugAction);
+        }
+        else
+            UE_LOG(DuelShooterPlayerLog, Warning, TEXT("DebugAction input action is not defined"));
+#endif
+
         UE_LOG( DuelShooterPlayerLog, Log, TEXT( "Input actions successfully binded" ) );
     } else
         UE_LOG( DuelShooterPlayerLog, Error, TEXT( "Cannot bind input actions: Failed to get UEnhancedInputComponent" ) );
@@ -153,4 +191,10 @@ void ADuelShooterPlayer::GoBack()
     // TODO: Do something like escape menu
 }
 
+#if WITH_EDITORONLY_DATA
+void ADuelShooterPlayer::DoDebugAction()
+{
+    UE_LOG(DuelShooterPlayerLog, Log, TEXT("Debug action Triggered"));
+}
+#endif
 

@@ -3,6 +3,7 @@
 
 #include "DuelShooterGameMode.h"
 #include "GunDataAsset.h"
+#include "Blueprint/UserWidget.h"
 
 DEFINE_LOG_CATEGORY( DuelShooterGameModeLog );
 

@@ -72,37 +72,44 @@ void UGunConsumables::AppendSpread()
 	if (auto OwnerAsPawn = Cast<APawn>(Owner)) {
 
 		if (OwnerAsPawn->bUseControllerRotationYaw)
-			OwnerAsPawn->AddControllerYawInput(RotationToAppend.Yaw);
+			OwnerAsPawn->AddControllerYawInput(RotationToAppend.Pitch);
 		else
 			Owner->AddActorLocalRotation(FRotator(0, RotationToAppend.Yaw, 0));
 
 		if (OwnerAsPawn->bUseControllerRotationPitch)
-			OwnerAsPawn->AddControllerPitchInput(RotationToAppend.Pitch);
+			OwnerAsPawn->AddControllerPitchInput(RotationToAppend.Yaw);
 		else
-			Owner->AddActorLocalRotation(FRotator(RotationToAppend.Pitch, 0, 0));
+			Owner->AddActorLocalRotation(FRotator(0, 0, RotationToAppend.Pitch));
 
 	}
 	else
 		Owner->AddActorLocalRotation(RotationToAppend);
 	SpreadRotator += GetGunRotationToAppendForSpread();
-	OnSpreadAdded.Broadcast(GetGunRotationToAppendForSpread(), GetCharacterRotationToAppendForSpread(), SpreadRotator, Owner->GetActorRotation());
+	OnSightSpreadChanged.Broadcast(SpreadRotator);
 	CurrentBulletShotedContinouslyCount += 1;
 }
 
 void UGunConsumables::StartResetSpread()
 {
 	FTSTicker::GetCoreTicker().RemoveTicker(ResetSpreadTickerDelegateHandle);
-	ResetSpreadTickerDelegateHandle = FTSTicker::GetCoreTicker().AddTicker(ResetSpreadTickerDelegate);
+	//ResetSpreadTickerDelegateHandle = FTSTicker::GetCoreTicker().AddTicker(ResetSpreadTickerDelegate);
 	StartResetSpreadTime = FDateTime::Now();
-	RotationBeforeResetSpread = SpreadRotator;
-	UE_LOG(GunDatasLog, Warning, TEXT("Spread reset started"));
 }
 
 bool UGunConsumables::ResetSpreadTick(float DeltaTime)
 {
-	auto Progress = (FDateTime::Now() - StartResetSpreadTime).GetTotalSeconds() / SIGHT_SPREAD_RESET_SPEED;
-	SpreadRotator = Progress * RotationBeforeResetSpread;
-	if (Progress >= 1)
+	FRotator RotationToDecreaseFromSight = FRotator(SIGHT_SPREAD_RESET_SPEED * DeltaTime, SIGHT_SPREAD_RESET_SPEED * DeltaTime, 0);
+	if (SpreadRotator.Pitch < 0)
+		RotationToDecreaseFromSight.Pitch *= -1;
+	if (SpreadRotator.Yaw < 0)
+		RotationToDecreaseFromSight.Yaw *= -1;
+	if (FMath::Abs(RotationToDecreaseFromSight.Pitch) >= FMath::Abs(SpreadRotator.Pitch) || SpreadRotator.Pitch == 0)
+		RotationToDecreaseFromSight.Pitch = SpreadRotator.Pitch;
+	if (FMath::Abs(RotationToDecreaseFromSight.Yaw) >= FMath::Abs(SpreadRotator.Yaw) || SpreadRotator.Yaw == 0)
+		RotationToDecreaseFromSight.Yaw = SpreadRotator.Yaw;
+	SpreadRotator -= RotationToDecreaseFromSight;
+	OnSightSpreadChanged.Broadcast(SpreadRotator);
+	if (SpreadRotator.IsZero())
 		EndResetSpread();
 
 	return true;
@@ -120,7 +127,7 @@ bool UGunConsumables::CanShoot() const
 	return BulletsInMagazineRemains > 0 && LastShootTime + FTimespan::FromSeconds(Gun->ShotsDelay) <= FDateTime::Now() && !bIsReloading;
 }
 
-void UGunConsumables::MakeShot()
+void UGunConsumables::MakeShot( FRotator PlayerAddedRotation, FRotator GunAddedRotation)
 {
 	BulletsInMagazineRemains -= 1;
 
@@ -141,17 +148,18 @@ FRotator UGunConsumables::GetGunRotationToAppendForSpread(const int& SpreadIndex
 {
 	if (!Gun->Spread.IsEmpty())
 		return FRotator(
-				Gun->Spread[
-				SpreadIndex == -1 ?
-					FGenericPlatformMath::Min(CurrentBulletShotedContinouslyCount, Gun->Spread.Num() - 1) :
-					SpreadIndex
-				].Value,
-			-Gun->Spread[
+			Gun->Spread[
 				SpreadIndex == -1 ?
 					FGenericPlatformMath::Min(CurrentBulletShotedContinouslyCount, Gun->Spread.Num() - 1) :
 					SpreadIndex
 				].Key,
-			0);
+			Gun->Spread[
+				SpreadIndex == -1 ?
+					FGenericPlatformMath::Min(CurrentBulletShotedContinouslyCount, Gun->Spread.Num() - 1) :
+					SpreadIndex
+				].Value,
+					0
+					) * GUN_ROTATION_SPREAD_MULTIPLIER;
 	else
 		return FRotator();
 }
@@ -160,17 +168,18 @@ FRotator UGunConsumables::GetCharacterRotationToAppendForSpread(const int& Sprea
 {
 	if ( !Gun->Spread.IsEmpty() )
 		return FRotator(
-			-Gun->Spread[
+			Gun->Spread[
 				SpreadIndex == -1 ?
 					FGenericPlatformMath::Min(CurrentBulletShotedContinouslyCount, Gun->Spread.Num() - 1) :
 					SpreadIndex
-				].Value * CHARACTER_ROTATION_SPREAD_MULTIPLIER,
-			-Gun->Spread[
+				].Key,
+			Gun->Spread[
 				SpreadIndex == -1 ?
 					FGenericPlatformMath::Min(CurrentBulletShotedContinouslyCount, Gun->Spread.Num() - 1) :
 					SpreadIndex
-				].Key * CHARACTER_ROTATION_SPREAD_MULTIPLIER,
-			0 );
+				].Value,
+					0
+			) * CHARACTER_ROTATION_SPREAD_MULTIPLIER;
 	else
 		return FRotator();
 }

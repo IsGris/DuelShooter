@@ -24,6 +24,8 @@ class DUELSHOOTER_API ADuelShooterPlayer : public ACharacter
 
 	ADuelShooterPlayer();
 	virtual void BeginPlay() override;
+	UFUNCTION()
+	void InitWidgets();
 
 	// ~ Components
 protected:
@@ -48,6 +50,9 @@ protected:
 	void MakeCrouch();
 	void MakeUnCrouch();
 	void GoBack();
+#if WITH_EDITORONLY_DATA
+	void DoDebugAction();
+#endif
 	// ~ ~ Functions
 	// ~ ~ Variables
 protected:
@@ -71,7 +76,18 @@ protected:
 	// Action for go back in interface
 	UPROPERTY(EditDefaultsOnly, Category = "Input")
 	UInputAction* GoBackAction;
+#if WITH_EDITORONLY_DATA
+	UPROPERTY(EditDefaultsOnly, Category = "Input")
+	UInputAction* DebugAction;
+#endif
 	// ~ ~ Variables
 	// ~ Input
 
+	// ~ Visual
+protected:
+	UPROPERTY(EditDefaultsOnly, Category = "Visual")
+	TSubclassOf<UUserWidget> PlayerInGameHUD;
+	UPROPERTY(BlueprintReadWrite, Category = "Visual")
+	UUserWidget* PlayerHUD;
+	// ~ Visual
 };

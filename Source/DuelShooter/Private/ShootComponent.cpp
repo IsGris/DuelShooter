@@ -8,6 +8,10 @@
 #include "Misc/Timespan.h"
 #include "BulletDamage.h"
 #include "Kismet/KismetMathLibrary.h"
+#include "WidgetDuelShooterFunctionLibrary.h"
+#include "Blueprint/WidgetLayoutLibrary.h"
+
+DEFINE_LOG_CATEGORY(DuelShooterShootComponentLog);
 
 void UShootComponent::BeginPlay()
 {
@@ -28,6 +32,16 @@ void UShootComponent::BeginPlay()
 			}
 }
 
+void UShootComponent::InitCrosshair(UWidget* NewCrosshair)
+{
+	if (!Cast<APawn>(Owner))
+		UE_LOG(DuelShooterShootComponentLog, Warning, TEXT("InitCrosshair failed: only owner with class inherited from pawn can have crosshair. Current owner: %s"), *FString(Owner->GetName()));
+
+	Crosshair = NewCrosshair;
+	if (CrosshairPositionChangeDelegateHandle.IsValid())
+		GunConsumables->OnSightSpreadChanged.Remove(CrosshairPositionChangeDelegateHandle);
+	CrosshairPositionChangeDelegateHandle = GunConsumables->OnSightSpreadChanged.AddUObject(this, &UShootComponent::ChangeCrosshairRelativePosition);
+}
 
 
 void UShootComponent::SetGun( const int& NewGunId )
@@ -80,11 +94,12 @@ void UShootComponent::Shoot()
 	if ( !GunConsumables->CanShoot() )
 		return;
 	
-	UE_LOG(LogTemp, Warning, TEXT("%s"), *(UKismetMathLibrary::GetForwardVector(Owner->GetActorRotation() + GunConsumables->SpreadRotator).ToString()));
-
+	auto OwnerRotation = Owner->GetActorRotation();
+	OwnerRotation = { OwnerRotation.Yaw, OwnerRotation.Pitch,0 };
 	FHitResult BulletHitResult;
+	FRotator NewRotationBullet = OwnerRotation + GunConsumables->SpreadRotator;
 	if (auto World = GetWorld())
-		if (World->LineTraceSingleByChannel(BulletHitResult, Owner->GetActorLocation(), UKismetMathLibrary::GetForwardVector(Owner->GetActorRotation() + GunConsumables->SpreadRotator) * BULLET_DISTANCE, ECollisionChannel::ECC_Visibility))
+		if (World->LineTraceSingleByChannel(BulletHitResult, Owner->GetActorLocation(), (UKismetMathLibrary::GetForwardVector(FRotator{NewRotationBullet.Yaw, NewRotationBullet.Pitch, 0})) * BULLET_DISTANCE, ECollisionChannel::ECC_Visibility))
 		{
 			if (BulletHitResult.BoneName.ToString().Contains("head"))
 				UGameplayStatics::ApplyPointDamage(BulletHitResult.GetActor(), Gun->Damage * DAMAGE_MULTIPLIER_IN_HEAD, BulletHitResult.TraceStart, BulletHitResult, Owner->GetInstigatorController(), Owner, UBulletDamage::StaticClass());
@@ -97,9 +112,11 @@ void UShootComponent::Shoot()
 			else 
 				UGameplayStatics::ApplyPointDamage(BulletHitResult.GetActor(), Gun->Damage, BulletHitResult.TraceStart, BulletHitResult, Owner->GetInstigatorController(), Owner, UBulletDamage::StaticClass());
 		}
-	DrawDebugLine(GetWorld(), Owner->GetActorLocation(), UKismetMathLibrary::GetForwardVector(Owner->GetActorRotation() + GunConsumables->SpreadRotator) * BULLET_DISTANCE, FColor::Red, false, 2, 0, 2);
 
-	OnShoot.Broadcast();
+	DrawDebugSphere(GetWorld(), BulletHitResult.Location, 4, 3, FColor::Yellow, false, 2);
+
+	OnShoot.Broadcast(GunConsumables->GetCharacterRotationToAppendForSpread(), GunConsumables->GetGunRotationToAppendForSpread());
+	auto NewRot = Owner->GetActorRotation();
 }
 
 bool UShootComponent::IsShooting() const
@@ -109,4 +126,29 @@ bool UShootComponent::IsShooting() const
 			return TimerManager->IsTimerActive( ShootingTimer );
 	
 	return false;
+}
+
+void UShootComponent::SetCrosshairPosition(const FVector2D& NewPosition)
+{
+	if (!Crosshair)
+		return;
+
+	UWidgetDuelShooterFunctionLibrary::MoveWidgetByPixels(NewPosition, Crosshair);
+}
+
+FVector2D UShootComponent::GetCrosshairPosition() const
+{
+	if (!Crosshair)
+		return FVector2D();
+
+	return UWidgetDuelShooterFunctionLibrary::GetAbsoluteWidgetPosition(UWidgetLayoutLibrary::SlotAsCanvasSlot(Crosshair));
+}
+
+void UShootComponent::ChangeCrosshairRelativePosition(FRotator NewRelativePosition)
+{
+	if (!Crosshair)
+		return;
+
+	auto OwnerRotation = Owner->GetActorRotation();
+	UWidgetDuelShooterFunctionLibrary::MoveWidgetByRotator(Cast<APawn>(Owner)->GetController<APlayerController>(), FRotator{OwnerRotation.Yaw, OwnerRotation.Pitch,0} + NewRelativePosition, Crosshair);
 }
