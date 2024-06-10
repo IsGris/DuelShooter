@@ -5,8 +5,10 @@
 #include "Kismet/GameplayStatics.h"
 #include "DuelShooterGameMode.h"
 #include "GunDataAsset.h"
-#include "Misc/Timespan.h"
 #include "BulletDamage.h"
+#include "Kismet/KismetMathLibrary.h"
+
+DEFINE_LOG_CATEGORY(DuelShooterShootComponentLog);
 
 void UShootComponent::BeginPlay()
 {
@@ -15,6 +17,7 @@ void UShootComponent::BeginPlay()
 	PrimaryComponentTick.bCanEverTick = false;
 	
 	Owner = GetOwner();
+	GunConsumables = NewObject<UGunConsumables>();
 
 	// Init gun
 	if ( GunId > -1 )
@@ -22,11 +25,9 @@ void UShootComponent::BeginPlay()
 			if ( auto GunData = GameMode->GetGunData( GunId ) )
 			{
 				Gun = GunData;
-				GunConsumables.InitGun( *GunData, *Owner );
+				GunConsumables->InitGun( *GunData, Owner, this );
 			}
 }
-
-
 
 void UShootComponent::SetGun( const int& NewGunId )
 {
@@ -38,7 +39,7 @@ void UShootComponent::SetGun( const int& NewGunId )
 			if ( auto GunData = GameMode->GetGunData( GunId ) )
 			{
 				Gun = GunData;
-				GunConsumables.InitGun( *GunData, *Owner );
+				GunConsumables->InitGun(*GunData, Owner, this );
 			}
 }
 
@@ -46,7 +47,7 @@ void UShootComponent::SetGunByInfo( const FGunInfo& NewGunInfo )
 {
 	GunId = -1;
 	Gun = &NewGunInfo;
-	GunConsumables.InitGun( NewGunInfo, *Owner );
+	GunConsumables->InitGun( NewGunInfo, Owner, this );
 }
 
 void UShootComponent::StartShooting()
@@ -70,35 +71,37 @@ void UShootComponent::EndShooting()
 
 void UShootComponent::Reload()
 {
-	GunConsumables.StartReload();
+	GunConsumables->StartReload();
 }
 
 void UShootComponent::Shoot()
 {
-	if ( !GunConsumables.CanShoot() )
+	if ( !GunConsumables->CanShoot() )
 		return;
 	
-	GunConsumables.MakeShot();
-
+	auto OwnerRotation = Owner->GetActorRotation();
+	OwnerRotation = { OwnerRotation.Yaw, OwnerRotation.Pitch,0 };
 	FHitResult BulletHitResult;
+	FRotator NewRotationBullet = OwnerRotation + GunConsumables->SpreadRotator;
 	if (auto World = GetWorld())
-		if (World->LineTraceSingleByChannel(BulletHitResult, Owner->GetActorLocation(), Owner->GetActorForwardVector() * BULLET_DISTANCE, ECollisionChannel::ECC_Visibility))
-			UGameplayStatics::ApplyPointDamage(BulletHitResult.GetActor(), Gun->Damage, BulletHitResult.TraceStart, BulletHitResult, Owner->GetInstigatorController(), Owner, UBulletDamage::StaticClass());
-	DrawDebugLine(GetWorld(), Owner->GetActorLocation(), Owner->GetActorForwardVector() * BULLET_DISTANCE, FColor::Red, false, 2, 0, 2);
+		if (World->LineTraceSingleByChannel(BulletHitResult, Owner->GetActorLocation(), (UKismetMathLibrary::GetForwardVector(FRotator{NewRotationBullet.Yaw, NewRotationBullet.Pitch, 0})) * BULLET_DISTANCE, ECollisionChannel::ECC_Visibility))
+		{
+			if (BulletHitResult.BoneName.ToString().Contains("head"))
+				UGameplayStatics::ApplyPointDamage(BulletHitResult.GetActor(), Gun->Damage * DAMAGE_MULTIPLIER_IN_HEAD, BulletHitResult.TraceStart, BulletHitResult, Owner->GetInstigatorController(), Owner, UBulletDamage::StaticClass());
+			else if (BulletHitResult.BoneName.ToString().Contains("body"))
+				UGameplayStatics::ApplyPointDamage(BulletHitResult.GetActor(), Gun->Damage * DAMAGE_MULTIPLIER_IN_BODY, BulletHitResult.TraceStart, BulletHitResult, Owner->GetInstigatorController(), Owner, UBulletDamage::StaticClass());
+			else if (BulletHitResult.BoneName.ToString().Contains("hand"))
+				UGameplayStatics::ApplyPointDamage(BulletHitResult.GetActor(), Gun->Damage * DAMAGE_MULTIPLIER_IN_HAND, BulletHitResult.TraceStart, BulletHitResult, Owner->GetInstigatorController(), Owner, UBulletDamage::StaticClass());
+			else if (BulletHitResult.BoneName.ToString().Contains("leg"))
+				UGameplayStatics::ApplyPointDamage(BulletHitResult.GetActor(), Gun->Damage * DAMAGE_MULTIPLIER_IN_LEG, BulletHitResult.TraceStart, BulletHitResult, Owner->GetInstigatorController(), Owner, UBulletDamage::StaticClass());
+			else 
+				UGameplayStatics::ApplyPointDamage(BulletHitResult.GetActor(), Gun->Damage, BulletHitResult.TraceStart, BulletHitResult, Owner->GetInstigatorController(), Owner, UBulletDamage::StaticClass());
+		}
 
-	AppendSpreadToScreen();
+	DrawDebugSphere(GetWorld(), BulletHitResult.Location, 4, 3, FColor::Yellow, false, 2);
 
-	OnShoot.Broadcast();
-}
-
-void UShootComponent::ResetSpread()
-{
-	GunConsumables.ResetSpread();
-}
-
-void UShootComponent::AppendSpreadToScreen()
-{
-	Owner->SetActorRotation( Owner->GetActorRotation() + GunConsumables.GetRotationToAppendForSpread() );
+	OnShoot.Broadcast(GunConsumables->GetCharacterRotationToAppendForSpread(), GunConsumables->GetGunRotationToAppendForSpread());
+	auto NewRot = Owner->GetActorRotation();
 }
 
 bool UShootComponent::IsShooting() const

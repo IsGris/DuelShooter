@@ -7,7 +7,11 @@
 #include "GunDataAsset.h"
 #include "ShootComponent.generated.h"
 
-DECLARE_DYNAMIC_MULTICAST_DELEGATE( FOnShootSignature );
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams( FOnShootSignature, FRotator, PlayerAddedRotation, FRotator, GunAddedRotation);
+
+DECLARE_LOG_CATEGORY_EXTERN(DuelShooterShootComponentLog, Log, All);
+
+class UWidget;
 
 UCLASS( ClassGroup=(Custom), meta=(BlueprintSpawnableComponent) )
 class UShootComponent : public UActorComponent
@@ -36,10 +40,6 @@ public:
 	// Shoot 1 ammo
 	UFUNCTION( BlueprintCallable )
 	virtual void Shoot();
-	// Reset spread of gun
-	virtual void ResetSpread();
-	// Adds spread to the sight
-	virtual void AppendSpreadToScreen();
 	// Checks does gun now shooting
 	UFUNCTION( BlueprintCallable )
 	bool IsShooting() const;
@@ -52,8 +52,7 @@ protected:
 	// Current gun
 	const FGunInfo* Gun;
 	UPROPERTY( BlueprintReadWrite, Category = "Gun" )
-	FGunConsumables GunConsumables;
-
+	UGunConsumables* GunConsumables;
 	UPROPERTY()
 	FTimerHandle ShootingTimer;
 };
