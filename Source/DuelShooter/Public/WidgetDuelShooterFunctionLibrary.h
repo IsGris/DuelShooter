@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "Kismet/BlueprintFunctionLibrary.h"
+#include "DuelShooterPlayerController.h"
 #include "WidgetDuelShooterFunctionLibrary.generated.h"
 
 DECLARE_LOG_CATEGORY_EXTERN(DuelShooterWidgetsLog, Log, All);
@@ -71,11 +72,4 @@ public:
 	*/
 	UFUNCTION(BlueprintPure, Category = "Widgets|Position")
 	static bool MoveWidgetByPixels(const FVector2D& NewAbsoluteLocation, UWidget* Widget);
-
-	/*
-	* Move the widget's position to rotator
-	* @param Widget Canvas panel slot of widget
-	*/
-	UFUNCTION(BlueprintPure, Category = "Widgets|Position")
-	static bool MoveWidgetByRotator(APlayerController* Owner, FRotator NewWidgetLocation, UWidget* Widget);
 };

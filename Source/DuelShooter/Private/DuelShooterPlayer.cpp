@@ -36,23 +36,6 @@ void ADuelShooterPlayer::InitWidgets()
 {
     PlayerHUD = UWidgetDuelShooterFunctionLibrary::InitWidgetInstance(Cast<APlayerController>(GetController()), PlayerInGameHUD, FName("PlayerHUD"));
 
-    if (PlayerHUD) 
-    {
-        TArray<UWidget*> AllPlayerHUDWidgets;
-        PlayerHUD->WidgetTree->GetAllWidgets(AllPlayerHUDWidgets);
-        bool IsCrosshairFinded = false;
-        for (auto& HUDWidget : AllPlayerHUDWidgets)
-            if (HUDWidget->GetName().Contains("Crosshair")) {
-                ShootComponent->InitCrosshair(HUDWidget);
-                IsCrosshairFinded = true;
-                break;
-            }
-
-        if (!IsCrosshairFinded)
-            UE_LOG(DuelShooterPlayerLog, Warning, TEXT("In PlayerInGameHUD widget with name Crosshair not finded"));
-    } else 
-        UE_LOG(DuelShooterPlayerLog, Warning, TEXT("PlayerInGameHUD not defined"));
-
     UE_LOG(DuelShooterPlayerLog, Log, TEXT("Widgets inited"));
 }
 

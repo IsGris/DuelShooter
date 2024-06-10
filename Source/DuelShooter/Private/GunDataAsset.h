@@ -9,17 +9,14 @@
 #include "GunDataAsset.generated.h"
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FReloadSignature);
-DECLARE_MULTICAST_DELEGATE_OneParam( FOnSightSpreadChangedSignature, FRotator/*NewSightSpread*/);
 DECLARE_LOG_CATEGORY_EXTERN(GunDatasLog, Log, All);
 
 // Time between shots in seconds to reset spread to default value 
 #define TIME_BETWEEN_SHOTS_TO_RESET_SPREAD 2.0f
 // How far forward can a bullet travel
 #define BULLET_DISTANCE 10000
-// How many rotation units passes in a second
-#define SIGHT_SPREAD_RESET_SPEED 1.0f
 // Value in percent beetwen 0 and 1 by what percentage does the character rotate due to spread
-#define CHARACTER_ROTATION_SPREAD_MULTIPLIER 0.3f
+#define CHARACTER_ROTATION_SPREAD_MULTIPLIER 0.5f
 static_assert(0 <= CHARACTER_ROTATION_SPREAD_MULTIPLIER and CHARACTER_ROTATION_SPREAD_MULTIPLIER <= 1);
 #define GUN_ROTATION_SPREAD_MULTIPLIER (1 - CHARACTER_ROTATION_SPREAD_MULTIPLIER)
 #define DAMAGE_MULTIPLIER_IN_HEAD 1.0f
@@ -50,8 +47,9 @@ public:
 	// Time needed to reload gun
 	UPROPERTY( EditDefaultsOnly, BlueprintReadWrite, Category = "Gun" )
 	float ReloadTime = 1;
+	// How many damage gun will do in head
 	UPROPERTY( EditDefaultsOnly, BlueprintReadWrite, Category = "Gun" )
-	int Damage = 1;
+	int Damage = 100;
 	// How many ammo can store one magazine
 	UPROPERTY( EditDefaultsOnly, BlueprintReadWrite, Category = "Gun" )
 	int MagazineAmmoCount = 0;
@@ -106,15 +104,7 @@ protected:
 	UFUNCTION()
 	void AppendSpread();
 	UFUNCTION()
-	void StartResetSpread();
-	UFUNCTION()
-	bool ResetSpreadTick(float DeltaTime);
-	UFUNCTION()
-	void EndResetSpread();
-	FTickerDelegate ResetSpreadTickerDelegate;
-	FTSTicker::FDelegateHandle ResetSpreadTickerDelegateHandle;
-	UPROPERTY()
-	FDateTime StartResetSpreadTime;
+	void ResetSpread();
 	UPROPERTY()
 	FTimerHandle ResetSpreadAfterShootTimerHandle;
 
@@ -123,9 +113,6 @@ public:
 	FReloadSignature OnReloadStart;
 	UPROPERTY( BlueprintAssignable )
 	FReloadSignature OnReloadEnd;
-	// Event for spread added
-	// * NewSightSpread - Sight Spread rotator after change
-	FOnSightSpreadChangedSignature OnSightSpreadChanged;
 	void StartReload();
 	UFUNCTION(BlueprintCallable)
 	bool IsReloading() const;

@@ -145,22 +145,3 @@ bool UWidgetDuelShooterFunctionLibrary::MoveWidgetByPixels(const FVector2D& NewA
 	CanvasPanelSlot->SetOffsets(UWidgetDuelShooterFunctionLibrary::WidgetAbsolutePositionToMargin(NewAbsoluteLocation.X, NewAbsoluteLocation.Y, CanvasPanelSlot));
 	return true;
 }
-#include "GameFramework/CharacterMovementComponent.h"
-bool UWidgetDuelShooterFunctionLibrary::MoveWidgetByRotator(APlayerController* Owner, FRotator NewWidgetLocation, UWidget* Widget)
-{
-	if (!Owner || !Widget)
-		return false;
-
-	FVector2D NewOffset;
-	// Convert rotator for forward vector function
-	// Pitch = Move widget by Y axis
-	// Yaw = Move widget by X axis
-	auto DoesWork = UWidgetLayoutLibrary::ProjectWorldLocationToWidgetPosition(Owner, Owner->GetPawn()->GetActorLocation() + UKismetMathLibrary::GetForwardVector(FRotator{ NewWidgetLocation.Yaw, NewWidgetLocation.Pitch, 0 }), NewOffset, false);
-	if (!DoesWork)
-		return false;
-
-	FVector2D SubtractOffset = GetWidgetSize(Widget);
-	SubtractOffset.X = SubtractOffset.X * 0.5 + 27; // for some reason there is such a formula for the correct location of the widget
-	SubtractOffset.Y = SubtractOffset.Y * 0.5; // half of widget size for center position
-	return UWidgetDuelShooterFunctionLibrary::MoveWidgetByPixels(NewOffset - SubtractOffset, Widget);
-}

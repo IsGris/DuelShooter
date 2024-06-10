@@ -19,7 +19,6 @@ void UGunConsumables::InitGun(const FGunInfo& GunInfo, AActor* OwnerActor, UShoo
 	BulletsInMagazineRemains = Gun->MagazineAmmoCount;
 	BulletsNotInMagazineRemains = FGenericPlatformMath::Max(0, Gun->AmmoOnStart - Gun->MagazineAmmoCount);
 	CurrentBulletShotedContinouslyCount = 0;
-	ResetSpreadTickerDelegate = FTickerDelegate::CreateUObject(this, &UGunConsumables::ResetSpreadTick);
 }
 
 bool UGunConsumables::CanReload() const
@@ -45,7 +44,7 @@ void UGunConsumables::StartReload()
 		return;
 
 	bIsReloading = true;
-	StartResetSpread();
+	ResetSpread();
 
 	if (auto World = Owner->GetWorld())
 		if (auto* TimerManager = &World->GetTimerManager()) 
@@ -85,39 +84,11 @@ void UGunConsumables::AppendSpread()
 	else
 		Owner->AddActorLocalRotation(RotationToAppend);
 	SpreadRotator += GetGunRotationToAppendForSpread();
-	OnSightSpreadChanged.Broadcast(SpreadRotator);
 	CurrentBulletShotedContinouslyCount += 1;
 }
 
-void UGunConsumables::StartResetSpread()
+void UGunConsumables::ResetSpread()
 {
-	FTSTicker::GetCoreTicker().RemoveTicker(ResetSpreadTickerDelegateHandle);
-	//ResetSpreadTickerDelegateHandle = FTSTicker::GetCoreTicker().AddTicker(ResetSpreadTickerDelegate);
-	StartResetSpreadTime = FDateTime::Now();
-}
-
-bool UGunConsumables::ResetSpreadTick(float DeltaTime)
-{
-	FRotator RotationToDecreaseFromSight = FRotator(SIGHT_SPREAD_RESET_SPEED * DeltaTime, SIGHT_SPREAD_RESET_SPEED * DeltaTime, 0);
-	if (SpreadRotator.Pitch < 0)
-		RotationToDecreaseFromSight.Pitch *= -1;
-	if (SpreadRotator.Yaw < 0)
-		RotationToDecreaseFromSight.Yaw *= -1;
-	if (FMath::Abs(RotationToDecreaseFromSight.Pitch) >= FMath::Abs(SpreadRotator.Pitch) || SpreadRotator.Pitch == 0)
-		RotationToDecreaseFromSight.Pitch = SpreadRotator.Pitch;
-	if (FMath::Abs(RotationToDecreaseFromSight.Yaw) >= FMath::Abs(SpreadRotator.Yaw) || SpreadRotator.Yaw == 0)
-		RotationToDecreaseFromSight.Yaw = SpreadRotator.Yaw;
-	SpreadRotator -= RotationToDecreaseFromSight;
-	OnSightSpreadChanged.Broadcast(SpreadRotator);
-	if (SpreadRotator.IsZero())
-		EndResetSpread();
-
-	return true;
-}
-
-void UGunConsumables::EndResetSpread()
-{
-	FTSTicker::GetCoreTicker().RemoveTicker(ResetSpreadTickerDelegateHandle);
 	CurrentBulletShotedContinouslyCount = 0;
 	SpreadRotator = FRotator::ZeroRotator;
 }
@@ -135,9 +106,8 @@ void UGunConsumables::MakeShot( FRotator PlayerAddedRotation, FRotator GunAddedR
 		if (auto* TimerManager = &World->GetTimerManager()) {
 			if ((*TimerManager).IsTimerActive(ResetSpreadAfterShootTimerHandle)) 
 				(*TimerManager).ClearTimer(ResetSpreadAfterShootTimerHandle);
-			FTSTicker::GetCoreTicker().RemoveTicker(ResetSpreadTickerDelegateHandle);
 
-			(*TimerManager).SetTimer(ResetSpreadAfterShootTimerHandle, this, &UGunConsumables::StartResetSpread, 0.00001f, false, TIME_BETWEEN_SHOTS_TO_RESET_SPREAD);
+			(*TimerManager).SetTimer(ResetSpreadAfterShootTimerHandle, this, &UGunConsumables::ResetSpread, 0.00001f, false, TIME_BETWEEN_SHOTS_TO_RESET_SPREAD);
 		}
 
 	AppendSpread();

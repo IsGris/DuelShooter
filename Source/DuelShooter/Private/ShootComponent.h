@@ -21,7 +21,6 @@ class UShootComponent : public UActorComponent
 	virtual void BeginPlay() override;
 
 public:
-	void InitCrosshair(UWidget* NewCrosshair);
 	// Event for shoot
 	UPROPERTY( BlueprintAssignable, Category = "Shoot" )
 	FOnShootSignature OnShoot;
@@ -44,10 +43,6 @@ public:
 	// Checks does gun now shooting
 	UFUNCTION( BlueprintCallable )
 	bool IsShooting() const;
-	UFUNCTION(BlueprintCallable)
-	void SetCrosshairPosition(const FVector2D& NewPosition);
-	UFUNCTION(BlueprintCallable)
-	FVector2D GetCrosshairPosition() const;
 protected:
 	UPROPERTY()
 	TObjectPtr<AActor> Owner;
@@ -60,9 +55,4 @@ protected:
 	UGunConsumables* GunConsumables;
 	UPROPERTY()
 	FTimerHandle ShootingTimer;
-	UPROPERTY(BlueprintReadWrite, Category = "Visual")
-	UWidget* Crosshair;
-	FDelegateHandle CrosshairPositionChangeDelegateHandle;
-	UFUNCTION()
-	void ChangeCrosshairRelativePosition( FRotator NewRelativePosition );
 };

@@ -5,11 +5,8 @@
 #include "Kismet/GameplayStatics.h"
 #include "DuelShooterGameMode.h"
 #include "GunDataAsset.h"
-#include "Misc/Timespan.h"
 #include "BulletDamage.h"
 #include "Kismet/KismetMathLibrary.h"
-#include "WidgetDuelShooterFunctionLibrary.h"
-#include "Blueprint/WidgetLayoutLibrary.h"
 
 DEFINE_LOG_CATEGORY(DuelShooterShootComponentLog);
 
@@ -31,18 +28,6 @@ void UShootComponent::BeginPlay()
 				GunConsumables->InitGun( *GunData, Owner, this );
 			}
 }
-
-void UShootComponent::InitCrosshair(UWidget* NewCrosshair)
-{
-	if (!Cast<APawn>(Owner))
-		UE_LOG(DuelShooterShootComponentLog, Warning, TEXT("InitCrosshair failed: only owner with class inherited from pawn can have crosshair. Current owner: %s"), *FString(Owner->GetName()));
-
-	Crosshair = NewCrosshair;
-	if (CrosshairPositionChangeDelegateHandle.IsValid())
-		GunConsumables->OnSightSpreadChanged.Remove(CrosshairPositionChangeDelegateHandle);
-	CrosshairPositionChangeDelegateHandle = GunConsumables->OnSightSpreadChanged.AddUObject(this, &UShootComponent::ChangeCrosshairRelativePosition);
-}
-
 
 void UShootComponent::SetGun( const int& NewGunId )
 {
@@ -126,29 +111,4 @@ bool UShootComponent::IsShooting() const
 			return TimerManager->IsTimerActive( ShootingTimer );
 	
 	return false;
-}
-
-void UShootComponent::SetCrosshairPosition(const FVector2D& NewPosition)
-{
-	if (!Crosshair)
-		return;
-
-	UWidgetDuelShooterFunctionLibrary::MoveWidgetByPixels(NewPosition, Crosshair);
-}
-
-FVector2D UShootComponent::GetCrosshairPosition() const
-{
-	if (!Crosshair)
-		return FVector2D();
-
-	return UWidgetDuelShooterFunctionLibrary::GetAbsoluteWidgetPosition(UWidgetLayoutLibrary::SlotAsCanvasSlot(Crosshair));
-}
-
-void UShootComponent::ChangeCrosshairRelativePosition(FRotator NewRelativePosition)
-{
-	if (!Crosshair)
-		return;
-
-	auto OwnerRotation = Owner->GetActorRotation();
-	UWidgetDuelShooterFunctionLibrary::MoveWidgetByRotator(Cast<APawn>(Owner)->GetController<APlayerController>(), FRotator{OwnerRotation.Yaw, OwnerRotation.Pitch,0} + NewRelativePosition, Crosshair);
 }
